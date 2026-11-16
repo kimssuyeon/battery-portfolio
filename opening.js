@@ -9,11 +9,11 @@
   const CX = 961.91, FLOOR = 718.18;
   let frame = 0, generation = 0, running = true, mode = 'intro';
   const dialogue=document.createElement('div');dialogue.className='opening-dialogue';dialogue.hidden=true;
-  dialogue.innerHTML='<p class="opening-line" aria-live="polite"></p><div class="opening-choices" hidden><button type="button" data-answer="yes">네 좋아요!</button><button type="button" data-answer="wait">음~ 조금만 기다려주세요!</button></div>';
+  dialogue.innerHTML='<p class="opening-line" aria-live="polite"></p><div class="opening-choices" hidden><button type="button" data-answer="yes">네 좋아요!</button><button type="button" data-answer="wait">음~ 조금만 기다려주세요!</button><button type="button" data-answer="ready" hidden>응!</button></div>';
   screen.append(dialogue);
   const line=dialogue.querySelector('.opening-line'), choices=dialogue.querySelector('.opening-choices');
   const bubble=document.createElement('button');bubble.type='button';bubble.className='opening-bubble';bubble.hidden=true;
-  bubble.setAttribute('aria-label','작업물 보러 가기');bubble.innerHTML='<span class="dots" aria-hidden="true">●●●</span><small>작업물 보러 가기</small>';
+  bubble.setAttribute('aria-label','준비 확인 대화 열기');bubble.innerHTML='<span class="dots" aria-hidden="true">●●●</span>';
   let letters=[], sentence='';
   function setSentence(text) {
     if(sentence===text)return;sentence=text;line.replaceChildren();letters=[];line.setAttribute('aria-label',text.replace('\n',' '));
@@ -27,13 +27,13 @@
   function lettering(elapsed,fadeAt=Infinity) {
     letters.forEach((letter,i)=>{const appear=ease((elapsed-i*.07)/.3),disappear=ease((elapsed-fadeAt-i*.042)/.3);letter.style.opacity=String(appear*(1-disappear));});
   }
-  const canPlay = () => ['dialogue','choice','choiceExit','play'].includes(mode);
+  const canPlay = () => ['dialogue','choice','choiceExit','play','confirm'].includes(mode);
   const blocked = ['pointerdown', 'pointerup', 'pointermove', 'click', 'dblclick', 'wheel', 'touchstart', 'touchmove', 'touchend', 'keydown'];
   function guard(e) {
     if (!running) return;
-    if(['choice','play'].includes(mode)&&e.type==='keydown'&&e.key==='Tab')return;
+    if(['choice','play','confirm'].includes(mode)&&e.type==='keydown'&&e.key==='Tab')return;
     const control=e.target.closest?.('.opening-choices button,.opening-bubble');
-    if(control && (mode==='choice'||mode==='play') && !['wheel','touchmove'].includes(e.type))return;
+    if(control && ['choice','play','confirm'].includes(mode) && !['wheel','touchmove'].includes(e.type))return;
     if(canPlay() && ['pointerdown','pointerup','pointermove','pointercancel','touchstart','touchend'].includes(e.type) && stage.contains(e.target))return;
     if(canPlay() && e.type==='pointermove')return;
     if (e.cancelable) e.preventDefault();
@@ -163,24 +163,32 @@
     const greetingStart=7.5, fadeAt=[...welcome].length*.07+1.55;
     const invitationStart=greetingStart+fadeAt+[...welcome].length*.042+.65;
     const choiceStart=invitationStart+[...invitation].length*.07+.45;
-    let choiceExitAt=0, choiceAction='';
+    let choiceExitAt=0, choiceAction='', confirmAt=0;
     let departure=0, departurePose=null, press=null, spring=null, held=false, lastPose=[1,1,0,0,0,0,0];
     let gazeX=0,gazeY=0,targetX=0,targetY=0,lastTime=begun,playStart=0;
     const hands=[{g:left,x:755.52,dx:0,dy:0,pointer:null,release:0},{g:right,x:1164.48,dx:0,dy:0,pointer:null,release:0}];
     const point=e=>{const p=new DOMPoint(e.clientX,e.clientY);return p.matrixTransform(svg.getScreenCTM().inverse());};
     function endPointers(){hands.forEach(h=>{if(h.pointer!==null&&svg.hasPointerCapture(h.pointer))svg.releasePointerCapture(h.pointer);h.pointer=null;});held=false;press=null;}
     function depart(){
-      if(!['choice','choiceExit','play'].includes(mode))return;
+      if(!['choice','choiceExit','play','confirm'].includes(mode))return;
       departurePose=lastPose.slice();endPointers();mode='depart';screen.dataset.mode=mode;departure=performance.now();
       choices.hidden=true;bubble.hidden=true;dialogue.hidden=true;
     }
     choices.querySelector('[data-answer="yes"]').addEventListener('click',()=>queueChoice('yes'));
-    bubble.addEventListener('click',depart);
+    bubble.addEventListener('click',()=>{
+      if(mode!=='play')return;
+      mode='confirm';screen.dataset.mode=mode;confirmAt=performance.now();bubble.hidden=true;
+      setSentence('준비 됐어요?');dialogue.hidden=false;choices.hidden=false;
+      choices.querySelector('[data-answer="yes"]').hidden=true;
+      choices.querySelector('[data-answer="wait"]').hidden=true;
+      const ready=choices.querySelector('[data-answer="ready"]');ready.hidden=false;ready.focus({preventScroll:true});
+    });
+    choices.querySelector('[data-answer="ready"]').addEventListener('click',()=>queueChoice('yes'));
     function enterPlay(){
       mode='play';screen.dataset.mode=mode;playStart=performance.now();dialogue.hidden=true;choices.hidden=true;bubble.hidden=false;
       bubble.focus({preventScroll:true});
     }
-    function queueChoice(action){if(mode!=='choice')return;choiceAction=action;choiceExitAt=performance.now();mode='choiceExit';choices.hidden=true;}
+    function queueChoice(action){if(!['choice','confirm'].includes(mode))return;choiceAction=action;choiceExitAt=performance.now();mode='choiceExit';choices.hidden=true;}
     choices.querySelector('[data-answer="wait"]').addEventListener('click',()=>queueChoice('wait'));
     function look(e){
       if(!canPlay())return;const p=point(e),dx=p.x-CX,dy=p.y-530;
@@ -220,6 +228,7 @@
         else {setSentence(invitation);lettering(elapsed-invitationStart);}
         if(elapsed>=choiceStart){const entering=mode!=='choice';mode='choice';screen.dataset.mode=mode;choices.hidden=false;if(entering)choices.querySelector('button').focus({preventScroll:true});}
       }
+      if(mode==='confirm')lettering((now-confirmAt)/1000);
       if(mode==='choiceExit'){lettering(100+(now-choiceExitAt)/1000,100);if(now-choiceExitAt>(letters.length*.042+.35)*1000){if(choiceAction==='wait')enterPlay();else depart();}}
       if(canPlay()) {
         // 77% means 0.77 of ORIGINAL BODY HEIGHT, not a 77% reduction. Hands retain scale 1.
@@ -290,7 +299,7 @@
         p.g.setAttribute('transform',`translate(${p.x+p.dx*flight} ${p.y+p.dy*flight+38*u*u}) rotate(${angle}) scale(${scale*stretch} ${scale/stretch})`);
       });
       screen.dataset.interactive=String(canPlay());
-      screen.dataset.phase=mode==='play'?'play':mode==='choice'?'choice':['dialogue','choiceExit'].includes(mode)?'dialogue':t<2?'look':t<3?'discover':t<6.5?'wave':t<7.5?'settle':t<8.5?'gather':t<9?'expand':t<10.5?'droplets':'white';
+      screen.dataset.phase=mode==='play'?'play':mode==='confirm'?'confirm':mode==='choice'?'choice':['dialogue','choiceExit'].includes(mode)?'dialogue':t<2?'look':t<3?'discover':t<6.5?'wave':t<7.5?'settle':t<8.5?'gather':t<9?'expand':t<10.5?'droplets':'white';
       // All spray and contact light are gone by 10.5s, then hold pure white for 1.5s.
       if(t>=10.5) svg.style.visibility='hidden';
       if(mode==='depart' && t>=12) {
