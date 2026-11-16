@@ -7,11 +7,11 @@
   function tick(now){
     if(!active||!svg)return;
     const matrix=svg.getScreenCTM();if(!matrix)return;
-    const origin=new DOMPoint(961.91,524.315).matrixTransform(matrix);
+    const origin=new DOMPoint(961.91,492.315).matrixTransform(matrix);
     const dx=pointer.x-origin.x,dy=pointer.y-origin.y,d=Math.hypot(dx,dy)||1;
     const strength=Math.min(1,d/150),blend=1-Math.exp(-Math.min(.1,(now-last)/1000)*12);last=now;
     x+=((dx/d)*17*strength-x)*blend;y+=((dy/d)*12*strength-y)*blend;
-    eyes.setAttribute('transform',`translate(${x} ${y})`);
+    eyes.setAttribute('transform',`translate(${x} ${y-32})`);
     frame=requestAnimationFrame(tick);
   }
   function update(){active=document.body.dataset.view==='portfolioScreen';cancelAnimationFrame(frame);if(active&&svg){last=performance.now();frame=requestAnimationFrame(tick);}}

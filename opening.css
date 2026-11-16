@@ -63,4 +63,4 @@ body.project-view .work-mascot{opacity:0}
 @media(max-width:650px){#portfolioScreen .folder{height:140px}}
 
 /* Peek up from the bottom edge instead of occupying the former navigation area. */
-#portfolioScreen .work-mascot{top:auto;bottom:calc(-1 * min(250px,50vw) * .22)}
+#portfolioScreen .work-mascot{top:auto;bottom:calc(-1 * min(250px,50vw) * .22 - 6px)}
