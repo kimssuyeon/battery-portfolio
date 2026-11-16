@@ -27,14 +27,15 @@
   function lettering(elapsed,fadeAt=Infinity) {
     letters.forEach((letter,i)=>{const appear=ease((elapsed-i*.07)/.3),disappear=ease((elapsed-fadeAt-i*.042)/.3);letter.style.opacity=String(appear*(1-disappear));});
   }
+  const canPlay = () => ['dialogue','choice','choiceExit','play'].includes(mode);
   const blocked = ['pointerdown', 'pointerup', 'pointermove', 'click', 'dblclick', 'wheel', 'touchstart', 'touchmove', 'touchend', 'keydown'];
   function guard(e) {
     if (!running) return;
     if(['choice','play'].includes(mode)&&e.type==='keydown'&&e.key==='Tab')return;
     const control=e.target.closest?.('.opening-choices button,.opening-bubble');
     if(control && (mode==='choice'||mode==='play') && !['wheel','touchmove'].includes(e.type))return;
-    if(mode==='play' && ['pointerdown','pointerup','pointermove','pointercancel','touchstart','touchend'].includes(e.type) && stage.contains(e.target))return;
-    if(mode==='play' && e.type==='pointermove')return;
+    if(canPlay() && ['pointerdown','pointerup','pointermove','pointercancel','touchstart','touchend'].includes(e.type) && stage.contains(e.target))return;
+    if(canPlay() && e.type==='pointermove')return;
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
   }
@@ -74,6 +75,12 @@
       result.push(...ab,...abc,...m,...bcd,...cd,...d);a=d;
     }
     return result;
+  }
+  // Match the upper midpoint and clockwise direction of the original capsule eyes.
+  // Aligned contours keep the eye thickness from pinching during a smile morph.
+  function eyeCurve(points) {
+    const contour=splitContour(points);
+    return [...contour.slice(6,8),...contour.slice(8),...contour.slice(2,8)];
   }
   function capsule(x,y,w,h) {
     const r=w/2,k=.55228475,top=y,bottom=y+h,right=x+w,left=x,c=x+r,upper=top+r,lower=bottom-r,mid=(upper+lower)/2;
@@ -171,8 +178,8 @@
     if(serial!==generation) return;
     screen.setAttribute('aria-busy','false');stage.style.opacity=1;
     const open=[capsule(908.77,506.82,21.77,34.99),capsule(993.27,506.82,21.77,34.99)];
-    const smile=[curve(919.655,527,11,-12,3),curve(1004.155,527,11,-12,3)];
-    const shut=[curve(919.655,524,11,-6,4),curve(1004.155,524,11,-6,4)];
+    const smile=[curve(919.655,519,10,-12,16),curve(1004.155,519,10,-12,16)];
+    const shut=[curve(919.655,519,10,-6,16),curve(1004.155,519,10,-6,16)];
     const smileMouth=curve(963,557,35,24,7.5), oMouth=oval(963,565,8,10);
     const begun=performance.now();
     const welcome='안녕하세요!\n제 포트폴리오에 오신걸 환영해요!';
@@ -200,19 +207,19 @@
     function queueChoice(action){if(mode!=='choice')return;choiceAction=action;choiceExitAt=performance.now();mode='choiceExit';choices.hidden=true;}
     choices.querySelector('[data-answer="wait"]').addEventListener('click',()=>queueChoice('wait'));
     function look(e){
-      if(mode!=='play')return;const p=point(e),dx=p.x-CX,dy=p.y-530;
+      if(!canPlay())return;const p=point(e),dx=p.x-CX,dy=p.y-530;
       targetX=Math.max(-22,Math.min(22,dx*.10));targetY=Math.max(-13,Math.min(13,dy*.08));
     }
     window.addEventListener('pointermove',look,{passive:true,signal:playListeners.signal});
     svg.addEventListener('pointerdown',e=>{
-      if(mode!=='play')return;const p=point(e),hand=hands.find(h=>h.g.contains(e.target));
+      if(!canPlay())return;const p=point(e),hand=hands.find(h=>h.g.contains(e.target));
       if(hand){if(hand.pointer!==null)return;hand.pointer=e.pointerId;hand.origin={x:p.x-hand.dx,y:p.y-hand.dy};hand.release=0;}
       else if(body.contains(e.target)){if(press)return;held=true;spring=null;press={pointer:e.pointerId,start:performance.now(),sy:lastPose[1]};}
       else return;
       e.preventDefault();svg.setPointerCapture(e.pointerId);
     });
     svg.addEventListener('pointermove',e=>{
-      if(mode!=='play')return;const h=hands.find(h=>h.pointer===e.pointerId);if(!h)return;
+      if(!canPlay())return;const h=hands.find(h=>h.pointer===e.pointerId);if(!h)return;
       const p=point(e);h.dx=Math.max(-150,Math.min(150,p.x-h.origin.x));h.dy=Math.max(-170,Math.min(145,p.y-h.origin.y));
     });
     function pointerEnd(e){
@@ -238,7 +245,7 @@
         if(elapsed>=choiceStart){const entering=mode!=='choice';mode='choice';screen.dataset.mode=mode;choices.hidden=false;if(entering)choices.querySelector('button').focus({preventScroll:true});}
       }
       if(mode==='choiceExit'){lettering(100+(now-choiceExitAt)/1000,100);if(now-choiceExitAt>(letters.length*.042+.35)*1000){if(choiceAction==='wait')enterPlay();else depart();}}
-      if(mode==='play') {
+      if(canPlay()) {
         // 77% means 0.77 of ORIGINAL BODY HEIGHT, not a 77% reduction. Hands retain scale 1.
         sy=press?mix(press.sy,.77,1-Math.exp(-(now-press.start)/70)):spring?1+(spring.sy-1)*Math.exp(-(now-spring.start)/190)*Math.cos((now-spring.start)/75):1;
         sx=1+(1-sy)*.46;shear=0;
@@ -270,11 +277,11 @@
       const chuckle=speaking?Math.pow(Math.max(0,Math.sin((elapsed-7.5)*2.25)),6):mode==='play'?Math.pow(Math.max(0,Math.sin((now-playStart)/1000*1.6)),12)*.8:0;
       const happy=t<7.5?ease((t-2.85)/.4):mode==='depart'?ease((now-departure)/350):Math.max(1-ease((elapsed-7.5)/.45),chuckle);
       const squeeze=mode==='depart'?ease((t-7.5)/.38):0;
-      const smoothing=1-Math.exp(-dt*12);gazeX=mix(gazeX,mode==='play'?targetX:0,smoothing);gazeY=mix(gazeY,mode==='play'?targetY:0,smoothing);
-      if(mode==='play')gaze=0;
+      const smoothing=1-Math.exp(-dt*12);gazeX=mix(gazeX,canPlay()?targetX:0,smoothing);gazeY=mix(gazeY,canPlay()?targetY:0,smoothing);
+      if(canPlay())gaze=0;
       eyes.forEach((eye,i)=> {
         let points=morph(open[i],splitContour(oval(i?1004.155:919.655,523,12.5,20)),surprise);
-        points=morph(points,splitContour(smile[i]),happy);points=morph(points,splitContour(shut[i]),squeeze);
+        points=morph(points,eyeCurve(smile[i]),happy);points=morph(points,eyeCurve(shut[i]),squeeze);
         const center=524.315;
         points=points.map((v,k)=>k%2?center+(v-center)*(1-blink*.94):v+gaze);
         eye.setAttribute('d',eyePath(points));
@@ -299,6 +306,7 @@
         p.g.setAttribute('opacity',String((1-ease((u-.52)/.48))*(u>0?1:0)));
         p.g.setAttribute('transform',`translate(${p.x+p.dx*flight} ${p.y+p.dy*flight+38*u*u}) rotate(${angle}) scale(${scale*stretch} ${scale/stretch})`);
       });
+      screen.dataset.interactive=String(canPlay());
       screen.dataset.phase=mode==='play'?'play':mode==='choice'?'choice':['dialogue','choiceExit'].includes(mode)?'dialogue':t<2?'look':t<3?'discover':t<6.5?'wave':t<7.5?'settle':t<8.5?'gather':t<9?'expand':t<10.5?'droplets':'white';
       // All spray and contact light are gone by 10.5s, then hold pure white for 1.5s.
       if(t>=10.5) svg.style.visibility='hidden';

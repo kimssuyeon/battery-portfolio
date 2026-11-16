@@ -21,8 +21,8 @@ body:has(.opening-screen.active){background:#fff}
 .opening-bubble .dots{display:block;color:#dce3e6;font:28px Arial;letter-spacing:3px;line-height:1}
 .opening-bubble small{display:block;font:18px OpeningSaeeum,sans-serif;margin-top:5px}
 .opening-bubble:hover{filter:brightness(.98)}
-.opening-screen[data-mode="play"] #openingStage svg{touch-action:none}
-.opening-screen[data-mode="play"] [data-name="몸통"]{cursor:grab}
-.opening-screen[data-mode="play"] [data-name$="팔"]{cursor:grab;pointer-events:all}
-.opening-screen[data-mode="play"] #openingStage svg:active{cursor:grabbing}
+.opening-screen[data-interactive="true"] #openingStage svg{touch-action:none}
+.opening-screen[data-interactive="true"] [data-name="몸통"]{cursor:grab}
+.opening-screen[data-interactive="true"] [data-name$="팔"]{cursor:grab;pointer-events:all}
+.opening-screen[data-interactive="true"] #openingStage svg:active{cursor:grabbing}
 @media(max-width:450px){.opening-dialogue{font-size:25px}.opening-choices{gap:8px}.opening-choices button{font-size:22px;padding:6px 15px}.opening-bubble small{font-size:15px}}
