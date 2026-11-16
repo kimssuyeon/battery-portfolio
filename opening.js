@@ -54,7 +54,7 @@
     Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,v));
     return e;
   };
-  // All expressions share one closed four-cubic contour, including the tightly shut eyes.
+  // Closed mouth contours; eyes below use a single round-capped stroked arch.
   function oval(x,y,rx,ry) {
     const k=.55228475;
     return [x,y-ry,x+k*rx,y-ry,x+rx,y-k*ry,x+rx,y,x+rx,y+k*ry,x+k*rx,y+ry,x,y+ry,x-k*rx,y+ry,x-rx,y+k*ry,x-rx,y,x-rx,y-k*ry,x-k*rx,y-ry,x,y-ry];
@@ -66,27 +66,6 @@
     return `M${points[0]},${points[1]} `+Array.from({length:4},(_,i)=>'C'+points.slice(2+i*6,8+i*6).join(' ')).join(' ')+'Z';
   }
   function morph(a,b,t) { return a.map((v,i)=>mix(v,b[i],t)); }
-  function splitContour(points) {
-    const result=points.slice(0,2);let a=points.slice(0,2);
-    const mid=(p,q)=>p.map((v,i)=>(v+q[i])/2);
-    for(let i=0;i<4;i++) {
-      const b=points.slice(2+i*6,4+i*6),c=points.slice(4+i*6,6+i*6),d=points.slice(6+i*6,8+i*6);
-      const ab=mid(a,b),bc=mid(b,c),cd=mid(c,d),abc=mid(ab,bc),bcd=mid(bc,cd),m=mid(abc,bcd);
-      result.push(...ab,...abc,...m,...bcd,...cd,...d);a=d;
-    }
-    return result;
-  }
-  // Match the upper midpoint and clockwise direction of the original capsule eyes.
-  // Aligned contours keep the eye thickness from pinching during a smile morph.
-  function eyeCurve(points) {
-    const contour=splitContour(points);
-    return [...contour.slice(6,8),...contour.slice(8),...contour.slice(2,8)];
-  }
-  function capsule(x,y,w,h) {
-    const r=w/2,k=.55228475,top=y,bottom=y+h,right=x+w,left=x,c=x+r,upper=top+r,lower=bottom-r,mid=(upper+lower)/2;
-    return [c,top,c+k*r,top,right,upper-k*r,right,upper,right,upper,right,mid,right,mid,right,mid,right,lower,right,lower,right,lower+k*r,c+k*r,bottom,c,bottom,c-k*r,bottom,left,lower+k*r,left,lower,left,lower,left,mid,left,mid,left,mid,left,upper,left,upper,left,upper-k*r,c-k*r,top,c,top];
-  }
-  function eyePath(points){return `M${points[0]},${points[1]} `+Array.from({length:8},(_,i)=>'C'+points.slice(2+i*6,8+i*6).join(' ')).join(' ')+'Z';}
   const poses = [
     // seconds, width, height, grounded shear, left x/y, right x/y
     [0,1,1,0,0,0,0,0], [.65,1.012,.988,.005,-1,1,1,0],
@@ -177,9 +156,6 @@
     await document.fonts.load('28px OpeningSaeeum');
     if(serial!==generation) return;
     screen.setAttribute('aria-busy','false');stage.style.opacity=1;
-    const open=[capsule(908.77,506.82,21.77,34.99),capsule(993.27,506.82,21.77,34.99)];
-    const smile=[curve(919.655,519,10,-12,16),curve(1004.155,519,10,-12,16)];
-    const shut=[curve(919.655,519,10,-6,16),curve(1004.155,519,10,-6,16)];
     const smileMouth=curve(963,557,35,24,7.5), oMouth=oval(963,565,8,10);
     const begun=performance.now();
     const welcome='안녕하세요!\n제 포트폴리오에 오신걸 환영해요!';
@@ -280,11 +256,18 @@
       const smoothing=1-Math.exp(-dt*12);gazeX=mix(gazeX,canPlay()?targetX:0,smoothing);gazeY=mix(gazeY,canPlay()?targetY:0,smoothing);
       if(canPlay())gaze=0;
       eyes.forEach((eye,i)=> {
-        let points=morph(open[i],splitContour(oval(i?1004.155:919.655,523,12.5,20)),surprise);
-        points=morph(points,eyeCurve(smile[i]),happy);points=morph(points,eyeCurve(shut[i]),squeeze);
-        const center=524.315;
-        points=points.map((v,k)=>k%2?center+(v-center)*(1-blink*.94):v+gaze);
-        eye.setAttribute('d',eyePath(points));
+        const x=i?1004.155:919.655;
+        // One stroked cubic: rounded vertical capsule -> simple arch. No filled outline to fold over.
+        const neutral=[x,517.705,x,522.11,x,526.52,x,530.925];
+        const round=[x,515.5,x,520.5,x,525.5,x,530.5];
+        const arch=[x-10,526,x-6,511,x+6,511,x+10,526];
+        const tight=[x-10,525,x-5,516,x+5,516,x+10,525];
+        let points=morph(neutral,round,surprise);
+        points=morph(points,arch,happy);points=morph(points,tight,squeeze);
+        points=points.map((v,k)=>k%2?524.315+(v-524.315)*(1-blink*.94):v+gaze);
+        eye.setAttribute('fill','none');eye.setAttribute('stroke','#35ba97');eye.setAttribute('stroke-linecap','round');
+        eye.setAttribute('stroke-width',String(mix(mix(21.77,25,surprise),16,Math.max(happy,squeeze))*(1-blink*.86)));
+        eye.setAttribute('d',`M${points[0]} ${points[1]} C${points.slice(2).join(' ')}`);
       });
       mouth.setAttribute('d',surprise>0?path(morph(smileMouth,oMouth,surprise)):originalMouth);
       const talk=speaking?1+.10*Math.sin(elapsed*9)*Math.sin(elapsed*2.7):1;
@@ -313,7 +296,7 @@
       if(mode==='depart' && t>=12) {
         playListeners.abort();
         stage.replaceChildren();screen.dataset.phase='complete';release();
-        show('portfolioScreen');document.querySelector('.corner').style.display='block';
+        show('profileScreen');document.querySelector('.corner').style.display='block';
         return;
       }
       frame=requestAnimationFrame(tick);
